@@ -515,6 +515,8 @@
     <!-- Library Grouping -->
     <string name="tracking_status">Tracking status</string>
     <string name="ungrouped">Ungrouped</string>
+    <string name="action_sort_rating">Rating</string>
+    <string name="action_display_rating_badge">Rating badge</string>
     <string name="not_tracked">Not tracked</string>
 
     <!-- Favorites Sync -->

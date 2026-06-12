@@ -52,6 +52,7 @@ internal fun LibraryComfortableGrid(
                         isLocal = libraryItem.isLocal,
                         sourceLanguage = libraryItem.sourceLanguage,
                     )
+                    RatingBadge(rating = libraryItem.rating)
                 },
                 onLongClick = { onLongClick(libraryItem.libraryManga) },
                 onClick = { onClick(libraryItem.libraryManga) },

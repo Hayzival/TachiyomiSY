@@ -236,6 +236,7 @@ private fun ColumnScope.SortPage(
             trackerMeanPair,
             // SY -->
             tagSortPair,
+            SYMR.strings.action_sort_rating to LibrarySort.Type.Rating,
             // SY <--
             MR.strings.action_sort_random to LibrarySort.Type.Random,
         )
@@ -339,6 +340,10 @@ private fun ColumnScope.DisplayPage(
     CheckboxItem(
         label = stringResource(MR.strings.action_display_language_badge),
         pref = screenModel.libraryPreferences.languageBadge,
+    )
+    CheckboxItem(
+        label = stringResource(SYMR.strings.action_display_rating_badge),
+        pref = screenModel.libraryPreferences.ratingBadge,
     )
     CheckboxItem(
         label = stringResource(MR.strings.action_display_show_continue_reading_button),

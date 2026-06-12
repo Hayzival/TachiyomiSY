@@ -47,6 +47,17 @@ internal fun LanguageBadge(
     }
 }
 
+@Composable
+internal fun RatingBadge(rating: Double) {
+    if (rating >= 0) {
+        Badge(
+            text = "%.1f".format(rating),
+            color = MaterialTheme.colorScheme.tertiary,
+            textColor = MaterialTheme.colorScheme.onTertiary,
+        )
+    }
+}
+
 @PreviewLightDark
 @Composable
 private fun BadgePreview() {
@@ -56,6 +67,7 @@ private fun BadgePreview() {
             UnreadBadge(count = 10)
             LanguageBadge(isLocal = true, sourceLanguage = "EN")
             LanguageBadge(isLocal = false, sourceLanguage = "EN")
+            RatingBadge(rating = 9.5)
         }
     }
 }

@@ -254,6 +254,8 @@
     <!-- Library Grouping -->
     <string name="tracking_status">Statut de suivi</string>
     <string name="ungrouped">Source non groupée</string>
+    <string name="action_sort_rating">Évaluation</string>
+    <string name="action_display_rating_badge">Badge de notation</string>
     <string name="not_tracked">Non suivi</string>
     <!-- Favorites Sync -->
     <string name="sync_favorites">Sync les favoris</string>

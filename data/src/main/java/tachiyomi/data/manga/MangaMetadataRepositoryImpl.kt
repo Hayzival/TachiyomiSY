@@ -71,6 +71,10 @@ class MangaMetadataRepositoryImpl(
         return handler.awaitList { search_metadataQueries.selectAll(::searchMetadataMapper) }
     }
 
+    override fun subscribeSearchMetadata(): Flow<List<SearchMetadata>> {
+        return handler.subscribeToList { search_metadataQueries.selectAll(::searchMetadataMapper) }
+    }
+
     private fun searchMetadataMapper(
         mangaId: Long,
         uploader: String?,

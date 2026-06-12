@@ -134,6 +134,8 @@ sealed class RaisedSearchMetadata {
 
     abstract fun getExtraInfoPairs(context: Context): List<Pair<String, String>>
 
+    open fun getRating(): Double? = null
+
     companion object {
         // Virtual tags allow searching of otherwise unindexed fields
         const val TAG_TYPE_VIRTUAL = -2

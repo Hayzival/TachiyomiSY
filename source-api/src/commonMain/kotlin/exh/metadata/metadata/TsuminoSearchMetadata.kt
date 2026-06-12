@@ -98,6 +98,8 @@ class TsuminoSearchMetadata : RaisedSearchMetadata() {
         }
     }
 
+    override fun getRating(): Double? = averageRating?.times(2.0f)?.toDouble()
+
     companion object {
         private const val TITLE_TYPE_MAIN = 0
 
