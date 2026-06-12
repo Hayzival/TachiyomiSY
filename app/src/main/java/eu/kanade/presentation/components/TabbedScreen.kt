@@ -43,15 +43,21 @@ fun TabbedScreen(
     Scaffold(
         topBar = {
             val tab = tabs[state.currentPage]
-            val searchEnabled = tab.searchEnabled
+            val selectionToolbar = tab.selectionToolbar
 
-            SearchToolbar(
-                titleContent = { AppBarTitle(stringResource(titleRes)) },
-                searchEnabled = searchEnabled,
-                searchQuery = if (searchEnabled) searchQuery else null,
-                onChangeSearchQuery = onChangeSearchQuery,
-                actions = { AppBarActions(tab.actions) },
-            )
+            if (tab.numberSelected > 0 && selectionToolbar != null) {
+                selectionToolbar()
+            } else {
+                val searchEnabled = tab.searchEnabled
+
+                SearchToolbar(
+                    titleContent = { AppBarTitle(stringResource(titleRes)) },
+                    searchEnabled = searchEnabled,
+                    searchQuery = if (searchEnabled) searchQuery else null,
+                    onChangeSearchQuery = onChangeSearchQuery,
+                    actions = { AppBarActions(tab.actions) },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { contentPadding ->
@@ -90,10 +96,12 @@ fun TabbedScreen(
     }
 }
 
-data class TabContent(
+open class TabContent(
     val titleRes: StringResource,
     val badgeNumber: Int? = null,
     val searchEnabled: Boolean = false,
     val actions: ImmutableList<AppBar.AppBarAction> = persistentListOf(),
     val content: @Composable (contentPadding: PaddingValues, snackbarHostState: SnackbarHostState) -> Unit,
+    val numberSelected: Int = 0,
+    val selectionToolbar: (@Composable () -> Unit)? = null,
 )

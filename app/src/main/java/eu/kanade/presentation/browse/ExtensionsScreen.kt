@@ -14,7 +14,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FlipToBack
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.util.fastAny
+import eu.kanade.presentation.browse.components.ExtensionsBottomActionMenu
+import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.components.AppBarActions
+import eu.kanade.tachiyomi.ui.browse.extension.ExtensionFilterScreen
+import tachiyomi.presentation.core.util.selectedBackground
 import androidx.compose.material.icons.outlined.GetApp
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Refresh
@@ -86,6 +98,11 @@ fun ExtensionScreen(
     onOpenExtension: (Extension.Installed) -> Unit,
     onClickUpdateAll: () -> Unit,
     onRefresh: () -> Unit,
+    // SY -->
+    onClickTrustSelected: () -> Unit,
+    onClickUninstallSelected: () -> Unit,
+    onClickUpdateSelected: () -> Unit,
+    // SY <--
 ) {
     val navigator = LocalNavigator.currentOrThrow
 
@@ -94,41 +111,53 @@ fun ExtensionScreen(
         onRefresh = onRefresh,
         enabled = !state.isLoading,
     ) {
-        when {
-            state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
-            state.isEmpty -> {
-                val msg = if (!searchQuery.isNullOrEmpty()) {
-                    MR.strings.no_results_found
-                } else {
-                    MR.strings.empty_screen
-                }
-                EmptyScreen(
-                    msg,
-                    modifier = Modifier.padding(contentPadding),
-                    actions = persistentListOf(
-                        EmptyScreenAction(
-                            stringRes = MR.strings.label_extension_repos,
-                            icon = Icons.Outlined.Settings,
-                            onClick = { navigator.push(ExtensionReposScreen()) },
+        Column {
+            when {
+                state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
+                state.isEmpty -> {
+                    val msg = if (!searchQuery.isNullOrEmpty()) {
+                        MR.strings.no_results_found
+                    } else {
+                        MR.strings.empty_screen
+                    }
+                    EmptyScreen(
+                        msg,
+                        modifier = Modifier.padding(contentPadding),
+                        actions = persistentListOf(
+                            EmptyScreenAction(
+                                stringRes = MR.strings.label_extension_repos,
+                                icon = Icons.Outlined.Settings,
+                                onClick = { navigator.push(ExtensionReposScreen()) },
+                            ),
                         ),
-                    ),
-                )
+                    )
+                }
+                else -> {
+                    Box(modifier = Modifier.weight(1f)) {
+                        ExtensionContent(
+                            state = state,
+                            contentPadding = contentPadding,
+                            onLongClickItem = onLongClickItem,
+                            onClickItemCancel = onClickItemCancel,
+                            onOpenWebView = onOpenWebView,
+                            onInstallExtension = onInstallExtension,
+                            onUninstallExtension = onUninstallExtension,
+                            onUpdateExtension = onUpdateExtension,
+                            onTrustExtension = onTrustExtension,
+                            onOpenExtension = onOpenExtension,
+                            onClickUpdateAll = onClickUpdateAll,
+                            selectionMode = state.selectionMode,
+                        )
+                    }
+                }
             }
-            else -> {
-                ExtensionContent(
-                    state = state,
-                    contentPadding = contentPadding,
-                    onLongClickItem = onLongClickItem,
-                    onClickItemCancel = onClickItemCancel,
-                    onOpenWebView = onOpenWebView,
-                    onInstallExtension = onInstallExtension,
-                    onUninstallExtension = onUninstallExtension,
-                    onUpdateExtension = onUpdateExtension,
-                    onTrustExtension = onTrustExtension,
-                    onOpenExtension = onOpenExtension,
-                    onClickUpdateAll = onClickUpdateAll,
-                )
-            }
+
+            ExtensionsBottomActionMenu(
+                visible = state.selectionMode,
+                onTrustClicked = onClickTrustSelected.takeIf { state.canTrustSelected },
+                onUninstallClicked = onClickUninstallSelected.takeIf { state.canUninstallSelected },
+                onUpdateClicked = onClickUpdateSelected.takeIf { state.canUpdateSelected },
+            )
         }
     }
 }
@@ -146,6 +175,7 @@ private fun ExtensionContent(
     onTrustExtension: (Extension.Untrusted) -> Unit,
     onOpenExtension: (Extension.Installed) -> Unit,
     onClickUpdateAll: () -> Unit,
+    selectionMode: Boolean,
 ) {
     val context = LocalContext.current
     var trustState by remember { mutableStateOf<Extension.Untrusted?>(null) }
@@ -207,9 +237,9 @@ private fun ExtensionContent(
                 contentType = { "item" },
                 key = { item ->
                     when (item.extension) {
-                        is Extension.Untrusted -> "extension-untrusted-${item.hashCode()}"
-                        is Extension.Installed -> "extension-installed-${item.hashCode()}"
-                        is Extension.Available -> "extension-available-${item.hashCode()}"
+                        is Extension.Untrusted -> "extension-untrusted-${item.extension.pkgName}"
+                        is Extension.Installed -> "extension-installed-${item.extension.pkgName}"
+                        is Extension.Available -> "extension-available-${item.extension.pkgName}"
                     }
                 },
             ) { item ->
@@ -217,11 +247,12 @@ private fun ExtensionContent(
                     modifier = Modifier.animateItemFastScroll(),
                     item = item,
                     onClickItem = {
-                        when (it) {
-                            is Extension.Available -> onInstallExtension(it)
-                            is Extension.Installed -> onOpenExtension(it)
-                            is Extension.Untrusted -> {
-                                trustState = it
+                        when {
+                            state.selectionMode -> onLongClickItem(it)
+                            it is Extension.Available -> onInstallExtension(it)
+                            it is Extension.Installed -> onOpenExtension(it)
+                            it is Extension.Untrusted -> {
+                                onLongClickItem(it)
                             }
                         }
                     },
@@ -245,10 +276,11 @@ private fun ExtensionContent(
                                 }
                             }
                             is Extension.Untrusted -> {
-                                trustState = it
+                                onLongClickItem(it)
                             }
                         }
                     },
+                    selectionMode = selectionMode,
                 )
             }
         }
@@ -279,13 +311,19 @@ private fun ExtensionItem(
     onClickItemAction: (Extension) -> Unit,
     onClickItemSecondaryAction: (Extension) -> Unit,
     modifier: Modifier = Modifier,
+    selectionMode: Boolean = false,
 ) {
-    val (extension, installStep) = item
+    val (extension, installStep, selected) = item
+    val haptic = LocalHapticFeedback.current
     BaseBrowseItem(
         modifier = modifier
+            .selectedBackground(selected)
             .combinedClickable(
                 onClick = { onClickItem(extension) },
-                onLongClick = { onLongClickItem(extension) },
+                onLongClick = {
+                    onLongClickItem(extension)
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                },
             ),
         onClickItem = { onClickItem(extension) },
         onLongClickItem = { onLongClickItem(extension) },
@@ -313,13 +351,15 @@ private fun ExtensionItem(
             }
         },
         action = {
-            ExtensionItemActions(
-                extension = extension,
-                installStep = installStep,
-                onClickItemCancel = onClickItemCancel,
-                onClickItemAction = onClickItemAction,
-                onClickItemSecondaryAction = onClickItemSecondaryAction,
-            )
+            if (!selectionMode) {
+                ExtensionItemActions(
+                    extension = extension,
+                    installStep = installStep,
+                    onClickItemCancel = onClickItemCancel,
+                    onClickItemAction = onClickItemAction,
+                    onClickItemSecondaryAction = onClickItemSecondaryAction,
+                )
+            }
         },
     ) {
         ExtensionItemContent(

@@ -46,9 +46,9 @@ class ExtensionsScreenModel(
 
     init {
         val context = Injekt.get<Application>()
-        val extensionMapper: (Map<String, InstallStep>) -> ((Extension) -> ExtensionUiModel.Item) = { map ->
+        val extensionMapper: (Map<String, InstallStep>, Set<String>) -> ((Extension) -> ExtensionUiModel.Item) = { map, selection ->
             {
-                ExtensionUiModel.Item(it, map[it.pkgName] ?: InstallStep.Idle)
+                ExtensionUiModel.Item(it, map[it.pkgName] ?: InstallStep.Idle, it.pkgName in selection)
             }
         }
 
@@ -59,16 +59,17 @@ class ExtensionsScreenModel(
                     .debounce(SEARCH_DEBOUNCE_MILLIS)
                     .map { searchQueryPredicate(it ?: "") },
                 currentDownloads,
+                state.map { it.selection }.distinctUntilChanged(),
                 getExtensions.subscribe(),
-            ) { predicate, downloads, (_updates, _installed, _available, _untrusted) ->
+            ) { predicate, downloads, selection, (_updates, _installed, _available, _untrusted) ->
                 buildMap {
-                    val updates = _updates.filter(predicate).map(extensionMapper(downloads))
+                    val updates = _updates.filter(predicate).map(extensionMapper(downloads, selection))
                     if (updates.isNotEmpty()) {
                         put(ExtensionUiModel.Header.Resource(MR.strings.ext_updates_pending), updates)
                     }
 
-                    val installed = _installed.filter(predicate).map(extensionMapper(downloads))
-                    val untrusted = _untrusted.filter(predicate).map(extensionMapper(downloads))
+                    val installed = _installed.filter(predicate).map(extensionMapper(downloads, selection))
+                    val untrusted = _untrusted.filter(predicate).map(extensionMapper(downloads, selection))
                     if (installed.isNotEmpty() || untrusted.isNotEmpty()) {
                         put(ExtensionUiModel.Header.Resource(MR.strings.ext_installed), installed + untrusted)
                     }
@@ -79,7 +80,7 @@ class ExtensionsScreenModel(
                         .toSortedMap(LocaleHelper.comparator)
                         .map { (lang, exts) ->
                             ExtensionUiModel.Header.Text(LocaleHelper.getSourceDisplayName(lang, context)) to
-                                exts.map(extensionMapper(downloads))
+                                exts.map(extensionMapper(downloads, selection))
                         }
                     if (languagesWithExtensions.isNotEmpty()) {
                         putAll(languagesWithExtensions)
@@ -208,6 +209,80 @@ class ExtensionsScreenModel(
         }
     }
 
+    fun toggleSelection(extension: Extension) {
+        mutableState.update { state ->
+            val newSelection = state.selection.toMutableSet().apply {
+                if (!add(extension.pkgName)) {
+                    remove(extension.pkgName)
+                }
+            }
+            state.copy(selection = newSelection)
+        }
+    }
+
+    fun toggleAllSelection() {
+        mutableState.update { state ->
+            val allItems = state.items.values.flatten().map { it.extension.pkgName }
+            val newSelection = if (state.selection.size == allItems.size) {
+                emptySet()
+            } else {
+                allItems.toSet()
+            }
+            state.copy(selection = newSelection)
+        }
+    }
+
+    fun invertSelection() {
+        mutableState.update { state ->
+            val allItems = state.items.values.flatten().map { it.extension.pkgName }
+            val newSelection = allItems.filterNot { it in state.selection }.toSet()
+            state.copy(selection = newSelection)
+        }
+    }
+
+    fun clearSelection() {
+        mutableState.update { it.copy(selection = emptySet()) }
+    }
+
+    fun trustSelected() {
+        val selectedItems = state.value.items.values.flatten()
+            .filter { it.selected && it.extension is Extension.Untrusted }
+            .map { it.extension as Extension.Untrusted }
+
+        if (selectedItems.isEmpty()) return
+
+        screenModelScope.launch {
+            selectedItems.forEach { extensionManager.trust(it) }
+            clearSelection()
+        }
+    }
+
+    fun uninstallSelected() {
+        val selectedItems = state.value.items.values.flatten()
+            .filter { it.selected }
+            .map { it.extension }
+
+        if (selectedItems.isEmpty()) return
+
+        screenModelScope.launchIO {
+            selectedItems.forEach { extensionManager.uninstallExtension(it) }
+            clearSelection()
+        }
+    }
+
+    fun updateSelected() {
+        val selectedItems = state.value.items.values.flatten()
+            .filter { it.selected && it.extension is Extension.Installed && it.extension.hasUpdate }
+            .map { it.extension as Extension.Installed }
+
+        if (selectedItems.isEmpty()) return
+
+        screenModelScope.launchIO {
+            selectedItems.forEach { updateExtension(it) }
+            clearSelection()
+        }
+    }
+
     @Immutable
     data class State(
         val isLoading: Boolean = true,
@@ -216,8 +291,14 @@ class ExtensionsScreenModel(
         val updates: Int = 0,
         val installer: BasePreferences.ExtensionInstaller? = null,
         val searchQuery: String? = null,
+        val selection: Set<String> = emptySet(),
     ) {
         val isEmpty = items.isEmpty()
+        val selectionMode = selection.isNotEmpty()
+
+        val canTrustSelected = selectionMode && items.values.flatten().any { it.selected && it.extension is Extension.Untrusted }
+        val canUninstallSelected = selectionMode && selection.isNotEmpty()
+        val canUpdateSelected = selectionMode && items.values.flatten().any { it.selected && it.extension is Extension.Installed && it.extension.hasUpdate }
     }
 }
 
@@ -232,5 +313,6 @@ object ExtensionUiModel {
     data class Item(
         val extension: Extension,
         val installStep: InstallStep,
+        val selected: Boolean = false,
     )
 }
