@@ -60,6 +60,7 @@ import exh.util.defaultReaderType
 import exh.util.mangaType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -182,6 +183,8 @@ class ReaderViewModel @JvmOverloads constructor(
     private var chapterReadStartTime: Long? = null
 
     private var chapterToDownload: Download? = null
+
+    private var progressJob: Job? = null
 
     private val unfilteredChapterList by lazy {
         val manga = manga!!
@@ -330,6 +333,10 @@ class ReaderViewModel @JvmOverloads constructor(
      */
     fun onActivityFinish() {
         deletePendingChapters()
+    }
+
+    suspend fun awaitProgressJob() {
+        progressJob?.join()
     }
 
     /**
@@ -598,7 +605,7 @@ class ReaderViewModel @JvmOverloads constructor(
         val pages = selectedChapter.pages ?: return
 
         // Save last page read and mark as read if needed
-        viewModelScope.launchNonCancellable {
+        progressJob = viewModelScope.launchNonCancellable {
             updateChapterProgress(selectedChapter, page/* SY --> */, hasExtraPage/* SY <-- */)
         }
 

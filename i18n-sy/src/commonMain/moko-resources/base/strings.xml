@@ -315,6 +315,9 @@
     <string name="enable_zoom_out">Enable zoom out</string>
     <string name="tap_scroll_page">Tap scroll by page</string>
     <string name="tap_scroll_page_summary">Tapping will scroll by page instead of screen size when this option is enabled</string>
+    <string name="pref_auto_exit_reader">Auto exit on last page</string>
+    <string name="pref_auto_exit_reader_summary">Automatically exit the reader when the last page of the last chapter is reached</string>
+    <string name="reader_exit_hint">Scroll again to exit</string>
     <string name="reader_bottom_buttons">Reader Bottom Buttons</string>
     <string name="reader_bottom_buttons_summary">Customize what buttons appear at the bottom of the reader</string>
     <string name="pref_show_vert_seekbar_landscape">Show vertical seekbar in landscape</string>

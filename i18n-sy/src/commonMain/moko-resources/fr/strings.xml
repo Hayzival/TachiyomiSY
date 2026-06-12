@@ -111,6 +111,7 @@
     <string name="open_debug_menu_summary"><![CDATA[NE TOUCHEZ PAS À CE MENU À MOINS DE SAVOIR CE QUE VOUS FAITES ! <font color=\'red\'>IL PEUT CORROMPRE VOTRE BIBLIOTHÈQUE !</font>]]></string>
     <string name="starting_cleanup">Démarrage du nettoyage</string>
     <string name="clean_up_downloaded_chapters">Effacer les chapitres téléchargés</string>
+    <string name="reader_exit_hint">Faites glisser à nouveau pour quitter</string>
     <string name="delete_unused_chapters">Supprimer les dossiers de chapitres inexistants, partiellement téléchargés et lus</string>
     <string name="no_folders_to_cleanup">Aucun dossier à nettoyer</string>
     <!--    <string name="clean_orphaned_downloads">Clean orphaned</string>-->

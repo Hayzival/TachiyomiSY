@@ -91,6 +91,8 @@ class ReaderPreferences(
 
     val skipDupe: Preference<Boolean> = preferenceStore.getBoolean("skip_dupe", false)
 
+    val autoExitReader: Preference<Boolean> = preferenceStore.getBoolean("pref_auto_exit_reader_key", false)
+
     val webtoonDisableZoomOut: Preference<Boolean> = preferenceStore.getBoolean("webtoon_disable_zoom_out", false)
 
     // endregion

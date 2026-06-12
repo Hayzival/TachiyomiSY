@@ -223,6 +223,11 @@ object SettingsReaderScreen : SearchableSettings {
                     preference = readerPreferences.alwaysShowChapterTransition,
                     title = stringResource(MR.strings.pref_always_show_chapter_transition),
                 ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = readerPreferences.autoExitReader,
+                    title = stringResource(SYMR.strings.pref_auto_exit_reader),
+                    subtitle = stringResource(SYMR.strings.pref_auto_exit_reader_summary),
+                ),
             ),
         )
     }

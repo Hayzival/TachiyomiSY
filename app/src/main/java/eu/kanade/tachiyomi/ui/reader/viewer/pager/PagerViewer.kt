@@ -50,7 +50,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     /**
      * Adapter of the pager.
      */
-    private val adapter = PagerViewerAdapter(this)
+    internal val adapter = PagerViewerAdapter(this)
 
     /**
      * Currently active item. It can be a chapter page or a chapter transition.
@@ -176,7 +176,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     /**
      * Returns the PagerPageHolder for the provided page
      */
-    private fun getPageHolder(page: ReaderPage): PagerPageHolder? =
+    internal fun getPageHolder(page: ReaderPage): PagerPageHolder? =
         pager.children
             .filterIsInstance<PagerPageHolder>()
             .firstOrNull { it.item.first == page || it.item.second == page }
@@ -260,15 +260,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
      * preload of the destination chapter of the transition.
      */
     private fun onTransitionSelected(transition: ChapterTransition) {
-        logcat { "onTransitionSelected: $transition" }
-        val toChapter = transition.to
-        if (toChapter != null) {
-            logcat { "Request preload destination chapter because we're on the transition" }
-            activity.requestPreloadChapter(toChapter)
-        } else if (transition is ChapterTransition.Next) {
-            // No more chapters, show menu because the user is probably going to close the reader
-            activity.showMenu()
-        }
+        activity.onTransitionSelected(transition)
     }
 
     /**

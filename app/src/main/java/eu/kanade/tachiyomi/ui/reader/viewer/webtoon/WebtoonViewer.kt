@@ -236,12 +236,7 @@ class WebtoonViewer(
      * preload of the destination chapter of the transition.
      */
     private fun onTransitionSelected(transition: ChapterTransition) {
-        logcat { "onTransitionSelected: $transition" }
-        val toChapter = transition.to
-        if (toChapter != null) {
-            logcat { "Request preload destination chapter because we're on the transition" }
-            activity.requestPreloadChapter(toChapter)
-        }
+        activity.onTransitionSelected(transition)
     }
 
     /**

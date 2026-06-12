@@ -56,6 +56,8 @@ import com.google.android.material.transition.platform.MaterialContainerTransfor
 import com.hippo.unifile.UniFile
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.manga.model.readingMode
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import eu.kanade.presentation.reader.ChapterListDialog
 import eu.kanade.presentation.reader.DisplayRefreshHost
 import eu.kanade.presentation.reader.OrientationSelectDialog
@@ -79,6 +81,7 @@ import eu.kanade.tachiyomi.ui.reader.ReaderViewModel.SetAsCoverResult.AddToLibra
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel.SetAsCoverResult.Error
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel.SetAsCoverResult.Success
 import eu.kanade.tachiyomi.ui.reader.loader.HttpPageLoader
+import eu.kanade.tachiyomi.ui.reader.model.ChapterTransition
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.model.ViewerChapters
@@ -184,7 +187,6 @@ class ReaderActivity : BaseActivity() {
     private var loadingIndicator: ReaderProgressIndicator? = null
 
     var isScrollingThroughPages = false
-        private set
 
     /**
      * Called when the activity is created. Initializes the presenter and configuration.
@@ -503,18 +505,23 @@ class ReaderActivity : BaseActivity() {
      * Called when the user clicks the back key or the button on the toolbar. The call is
      * delegated to the presenter.
      */
+    private var finishJob: Job? = null
     override fun finish() {
-        viewModel.onActivityFinish()
-        super.finish()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            overrideActivityTransition(
-                OVERRIDE_TRANSITION_CLOSE,
-                R.anim.shared_axis_x_pop_enter,
-                R.anim.shared_axis_x_pop_exit,
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            overridePendingTransition(R.anim.shared_axis_x_pop_enter, R.anim.shared_axis_x_pop_exit)
+        if (finishJob != null) return
+        finishJob = lifecycleScope.launch {
+            viewModel.awaitProgressJob()
+            viewModel.onActivityFinish()
+            super.finish()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                overrideActivityTransition(
+                    OVERRIDE_TRANSITION_CLOSE,
+                    R.anim.shared_axis_x_pop_enter,
+                    R.anim.shared_axis_x_pop_exit,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                overridePendingTransition(R.anim.shared_axis_x_pop_enter, R.anim.shared_axis_x_pop_exit)
+            }
         }
     }
 
@@ -1040,6 +1047,22 @@ class ReaderActivity : BaseActivity() {
         lifecycleScope.launch {
             viewModel.loadPreviousChapter()
             moveToPageIndex(0)
+        }
+    }
+
+    fun onTransitionSelected(transition: ChapterTransition) {
+        val toChapter = transition.to
+        if (toChapter != null) {
+            requestPreloadChapter(toChapter)
+        } else if (transition is ChapterTransition.Next) {
+            if (readerPreferences.autoExitReader.get()) {
+                lifecycleScope.launch {
+                    delay(500)
+                    finish()
+                }
+            } else if (viewModel.state.value.viewer is PagerViewer) {
+                showMenu()
+            }
         }
     }
 
