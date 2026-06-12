@@ -101,6 +101,8 @@ class MangaDexSearchMetadata : RaisedSearchMetadata(), TrackerIdMetadata {
         }
     }
 
+    override fun getRating(): Double? = rating?.toDouble()
+
     companion object {
         private const val TITLE_TYPE_MAIN = 0
 

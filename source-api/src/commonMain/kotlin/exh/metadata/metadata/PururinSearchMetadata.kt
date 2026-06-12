@@ -72,6 +72,8 @@ class PururinSearchMetadata : RaisedSearchMetadata() {
         }
     }
 
+    override fun getRating(): Double? = averageRating?.times(2.0)
+
     companion object {
         private const val TITLE_TYPE_TITLE = 0
         private const val TITLE_TYPE_ALT_TITLE = 1

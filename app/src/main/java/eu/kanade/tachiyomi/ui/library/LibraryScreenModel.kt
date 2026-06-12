@@ -145,6 +145,7 @@ class LibraryScreenModel(
     private val searchEngine: SearchEngine = Injekt.get(),
     private val setCustomMangaInfo: SetCustomMangaInfo = Injekt.get(),
     private val getMergedChaptersByMangaId: GetMergedChaptersByMangaId = Injekt.get(),
+    private val getSearchMetadata: tachiyomi.domain.manga.interactor.GetSearchMetadata = Injekt.get(),
 
     syncPreferences: SyncPreferences = Injekt.get(),
     // SY <--
@@ -180,9 +181,10 @@ class LibraryScreenModel(
                     libraryPreferences.sortingMode.changes(),
                     ::Pair,
                 ),
+                getSearchMetadata.subscribe(),
                 // SY <--
                 getLibraryItemPreferencesFlow(),
-            ) { (searchQuery, categories, favorites), (tracksMap, trackingFilters), /* SY --> */ (groupType, sortingMode)/* <-- SY */, itemPreferences ->
+            ) { (searchQuery, categories, favorites), (tracksMap, trackingFilters), /* SY --> */ (groupType, sortingMode)/* <-- SY */, /* SY --> */ metadata, /* SY <-- */ itemPreferences ->
                 val showSystemCategory = favorites.any { it.libraryManga.categories.contains(0) }
                 val filteredFavorites = favorites
                     .applyFilters(tracksMap, trackingFilters, itemPreferences)
@@ -197,6 +199,18 @@ class LibraryScreenModel(
                         }
                     }
 
+                // SY -->
+                val metadataRatings = metadata.associate {
+                    val meta = exh.metadata.metadata.base.FlatMetadata(it, emptyList(), emptyList())
+                    val raised = when {
+                        it.mangaId == exh.source.EH_SOURCE_ID || it.mangaId == exh.source.EXH_SOURCE_ID -> meta.raise<exh.metadata.metadata.EHentaiSearchMetadata>()
+                        it.mangaId in mangaDexSourceIds -> meta.raise<exh.metadata.metadata.MangaDexSearchMetadata>()
+                        else -> null
+                    }
+                    it.mangaId to (raised?.getRating() ?: -1.0)
+                }
+                // SY <--
+
                 LibraryData(
                     isInitialized = true,
                     showSystemCategory = showSystemCategory,
@@ -204,6 +218,9 @@ class LibraryScreenModel(
                     favorites = filteredFavorites,
                     tracksMap = tracksMap,
                     loggedInTrackerIds = trackingFilters.keys,
+                    // SY -->
+                    metadataRatings = metadataRatings,
+                    // SY <--
                 )
             }
                 .distinctUntilChanged()
@@ -241,6 +258,7 @@ class LibraryScreenModel(
                             data.loggedInTrackerIds,
                             // SY -->
                             libraryPreferences.sortingMode.get().takeIf { groupType != LibraryGroup.BY_DEFAULT },
+                            data.metadataRatings,
                             // SY <--
                         )
                         .let {
@@ -477,6 +495,7 @@ class LibraryScreenModel(
         loggedInTrackerIds: Set<Long>,
         // SY -->
         groupSort: LibrarySort? = null,
+        metadataRatings: Map<Long, Double> = emptyMap(),
         // SY <--
     ): Map<Category, List</* LibraryItem */ Long>> {
         // SY -->
@@ -513,6 +532,16 @@ class LibraryScreenModel(
                 }
             }
         }
+
+        // SY -->
+        val combinedRatings by lazy {
+            favoritesById.mapValues { (id, _) ->
+                val trackerScore = trackerScores[id]
+                val metadataRating = metadataRatings[id]
+                trackerScore ?: metadataRating ?: -1.0
+            }
+        }
+        // SY <--
 
         fun LibrarySort.comparator(): Comparator<LibraryItem> = Comparator { manga1, manga2 ->
             // SY -->
@@ -561,6 +590,14 @@ class LibraryScreenModel(
                     item1Score.compareTo(item2Score)
                 }
 
+                // SY -->
+                LibrarySort.Type.Rating -> {
+                    val item1Score = combinedRatings[manga1.id] ?: -1.0
+                    val item2Score = combinedRatings[manga2.id] ?: -1.0
+                    item1Score.compareTo(item2Score)
+                }
+                // SY <--
+
                 LibrarySort.Type.Random -> {
                     error("Why Are We Still Here? Just To Suffer?")
                 }
@@ -604,6 +641,7 @@ class LibraryScreenModel(
             libraryPreferences.unreadBadge.changes(),
             libraryPreferences.localBadge.changes(),
             libraryPreferences.languageBadge.changes(),
+            libraryPreferences.ratingBadge.changes(),
             libraryPreferences.autoUpdateMangaRestrictions.changes(),
 
             preferences.downloadedOnly.changes(),
@@ -622,16 +660,17 @@ class LibraryScreenModel(
                 unreadBadge = it[1] as Boolean,
                 localBadge = it[2] as Boolean,
                 languageBadge = it[3] as Boolean,
-                skipOutsideReleasePeriod = LibraryPreferences.MANGA_OUTSIDE_RELEASE_PERIOD in (it[4] as Set<*>),
-                globalFilterDownloaded = it[5] as Boolean,
-                filterDownloaded = it[6] as TriState,
-                filterUnread = it[7] as TriState,
-                filterStarted = it[8] as TriState,
-                filterBookmarked = it[9] as TriState,
-                filterCompleted = it[10] as TriState,
-                filterIntervalCustom = it[11] as TriState,
+                ratingBadge = it[4] as Boolean,
+                skipOutsideReleasePeriod = LibraryPreferences.MANGA_OUTSIDE_RELEASE_PERIOD in (it[5] as Set<*>),
+                globalFilterDownloaded = it[6] as Boolean,
+                filterDownloaded = it[7] as TriState,
+                filterUnread = it[8] as TriState,
+                filterStarted = it[9] as TriState,
+                filterBookmarked = it[10] as TriState,
+                filterCompleted = it[11] as TriState,
+                filterIntervalCustom = it[12] as TriState,
                 // SY -->
-                filterLewd = it[12] as TriState,
+                filterLewd = it[13] as TriState,
                 // SY <--
             )
         }
@@ -642,7 +681,39 @@ class LibraryScreenModel(
             getLibraryManga.subscribe(),
             getLibraryItemPreferencesFlow(),
             downloadCache.changes,
-        ) { libraryManga, preferences, _ ->
+            // SY -->
+            getSearchMetadata.subscribe(),
+            getTracksPerManga.subscribe(),
+            trackerManager.loggedInTrackersFlow(),
+            // SY <--
+        ) { it ->
+            val libraryManga = it[0] as List<tachiyomi.domain.library.model.LibraryManga>
+            val preferences = it[1] as ItemPreferences
+            val metadata = it[3] as List<exh.metadata.sql.models.SearchMetadata>
+            val tracksMap = it[4] as Map<Long, List<tachiyomi.domain.track.model.Track>>
+            val loggedInTrackers = it[5] as List<eu.kanade.tachiyomi.data.track.Tracker>
+
+            // SY -->
+            val metadataRatings = metadata.associate { metaData ->
+                val meta = exh.metadata.metadata.base.FlatMetadata(metaData, emptyList(), emptyList())
+                val raised = when {
+                    metaData.mangaId == exh.source.EH_SOURCE_ID || metaData.mangaId == exh.source.EXH_SOURCE_ID -> meta.raise<exh.metadata.metadata.EHentaiSearchMetadata>()
+                    metaData.mangaId in mangaDexSourceIds -> meta.raise<exh.metadata.metadata.MangaDexSearchMetadata>()
+                    else -> null
+                }
+                metaData.mangaId to (raised?.getRating() ?: -1.0)
+            }
+            val trackerMap = loggedInTrackers.associateBy { e -> e.id }
+            val trackerScores = tracksMap.mapValues { entry ->
+                if (entry.value.isEmpty()) {
+                    null
+                } else {
+                    entry.value
+                        .mapNotNull { trackerMap[it.trackerId]?.get10PointScore(it) }
+                        .average()
+                }
+            }
+            // SY <--
             libraryManga.map { manga ->
                 LibraryItem(
                     libraryManga = manga,
@@ -674,6 +745,13 @@ class LibraryScreenModel(
                     } else {
                         ""
                     },
+                    // SY -->
+                    rating = if (preferences.ratingBadge) {
+                        trackerScores[manga.id] ?: metadataRatings[manga.id] ?: -1.0
+                    } else {
+                        -1.0
+                    },
+                    // SY <--
                 )
             }
         }
@@ -1456,6 +1534,9 @@ class LibraryScreenModel(
         val unreadBadge: Boolean,
         val localBadge: Boolean,
         val languageBadge: Boolean,
+        // SY -->
+        val ratingBadge: Boolean,
+        // SY <--
         val skipOutsideReleasePeriod: Boolean,
 
         val globalFilterDownloaded: Boolean,
@@ -1478,6 +1559,9 @@ class LibraryScreenModel(
         val favorites: List<LibraryItem> = emptyList(),
         val tracksMap: Map</* Manga */ Long, List<Track>> = emptyMap(),
         val loggedInTrackerIds: Set<Long> = emptySet(),
+        // SY -->
+        val metadataRatings: Map<Long, Double> = emptyMap(),
+        // SY <--
     ) {
         val favoritesById by lazy { favorites.associateBy { it.id } }
     }

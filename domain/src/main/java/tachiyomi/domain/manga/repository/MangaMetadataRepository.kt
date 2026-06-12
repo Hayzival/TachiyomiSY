@@ -30,4 +30,6 @@ interface MangaMetadataRepository {
     suspend fun getIdsOfFavoriteMangaWithMetadata(): List<Long>
 
     suspend fun getSearchMetadata(): List<SearchMetadata>
+
+    fun subscribeSearchMetadata(): Flow<List<SearchMetadata>>
 }
